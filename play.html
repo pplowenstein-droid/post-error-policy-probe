@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Error Policy Probe</title>
+</head>
+<body>
+  <script>
+    const OLD_ENDPOINT = "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec";
+    const NEW_ENDPOINT = "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec";
+
+    fetch("index.html", { cache: "no-store" })
+      .then(response => response.text())
+      .then(html => {
+        document.open();
+        document.write(html.replace(OLD_ENDPOINT, NEW_ENDPOINT));
+        document.close();
+      })
+      .catch(error => {
+        document.body.textContent = "Unable to load experiment.";
+        console.error(error);
+      });
+  </script>
+</body>
+</html>
