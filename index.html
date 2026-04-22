@@ -1,973 +1,749 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Target Hit Experiment</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* ==================================================
-           GLOBAL & CSS VARIABLES
-           ================================================== */
-        :root {
-            /* Data URIs for a custom arrow cursor */
-            --cursor-arrow: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M4 4 L28 12 L18 18 L12 28 Z" fill="%23222" stroke="white" stroke-width="2"/></svg>') 4 4, crosshair;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Error Policy Probe</title>
+  <style>
+    :root {
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #23313d;
+      --muted: #607080;
+      --accent: #2878b8;
+      --accent-dark: #1f5d8e;
+      --ok: #207a55;
+      --warn: #6b7280;
+      --error: #b03a2e;
+      --target: #2f8fd3;
+      --target-border: #195d90;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
-            overflow: hidden; /* Prevent scrolling during the task */
-            cursor: var(--cursor-arrow);
-        }
+    * {
+      box-sizing: border-box;
+    }
 
-        /* Screen containers */
-        .screen {
-            display: none;
-            width: 100vw;
-            height: 100vh;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      overflow: hidden;
+      cursor: crosshair;
+    }
 
-        /* ==================================================
-           WELCOME & RESULTS SCREENS
-           ================================================== */
-        #welcome-screen, #results-screen {
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 20px;
-            box-sizing: border-box;
-            background: #ffffff;
-            overflow-y: auto; /* Allow scroll on results if needed */
-        }
+    .screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+    }
 
-        .container {
-            width: 100%;
-            max-width: 600px;
-            background: #fff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
+    #welcome-screen,
+    #complete-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-y: auto;
+      background: var(--panel);
+      cursor: default;
+    }
 
-        /* Results specific container to allow a wider layout for the chart */
-        #results-screen .container {
-            max-width: 800px;
-            margin: 40px 0;
-        }
+    .panel {
+      width: min(620px, 100%);
+      padding: 34px;
+      border: 1px solid #dce3e8;
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 8px 28px rgba(31, 48, 64, 0.10);
+      text-align: center;
+    }
 
-        h1 { margin-top: 0; color: #2c3e50; }
-        p { line-height: 1.6; font-size: 1.1rem; }
+    h1 {
+      margin: 0 0 18px;
+      font-size: 2rem;
+      color: var(--ink);
+    }
 
-        input[type="text"], input[type="number"], select {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0 16px;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
-            box-sizing: border-box;
-            background: #fff;
-        }
+    p {
+      margin: 12px 0;
+      line-height: 1.55;
+      font-size: 1.05rem;
+    }
 
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0 16px;
-            text-align: left;
-            margin: 20px 0;
-        }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 16px;
+      margin: 24px 0 18px;
+      text-align: left;
+    }
 
-        .form-grid .full-width {
-            grid-column: 1 / -1;
-        }
+    .full {
+      grid-column: 1 / -1;
+    }
 
-        label {
-            display: block;
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 0.95rem;
-        }
+    label {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
 
-        @media (max-width: 640px) {
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+    input,
+    select {
+      width: 100%;
+      margin: 8px 0 16px;
+      padding: 12px;
+      border: 2px solid #d4dde4;
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 1rem;
+    }
 
-        button {
-            padding: 12px 30px;
-            font-size: 1.1rem;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover { background-color: #2980b9; }
+    input:focus,
+    select:focus {
+      outline: 3px solid rgba(40, 120, 184, 0.18);
+      border-color: var(--accent);
+    }
 
-        /* ==================================================
-           RESULTS DASHBOARD UI
-           ================================================== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin: 20px 0;
-            display: none; /* Hidden until loaded */
-        }
+    button {
+      padding: 12px 28px;
+      border: 0;
+      border-radius: 5px;
+      background: var(--accent);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
-        .stat-box {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-        }
+    button:hover {
+      background: var(--accent-dark);
+    }
 
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #2c3e50;
-            display: block;
-            margin-top: 5px;
-        }
+    #start-error {
+      min-height: 22px;
+      margin-top: 12px;
+      color: var(--error);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
 
-        #chart-wrapper {
-            position: relative;
-            height: 350px;
-            width: 100%;
-            margin-top: 30px;
-            display: none; /* Hidden until loaded */
-        }
+    #task-screen {
+      background: #edf1f3;
+    }
 
-        .loading-spinner {
-            font-size: 1.2rem;
-            color: #7f8c8d;
-            margin-top: 20px;
-        }
+    #trial-progress {
+      position: absolute;
+      top: 22px;
+      right: 22px;
+      z-index: 30;
+      padding: 10px 14px;
+      border: 1px solid #d1d9df;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
+      font-weight: 800;
+      box-shadow: 0 3px 12px rgba(31, 48, 64, 0.08);
+    }
 
-        /* ==================================================
-           TASK SCREEN UI
-           ================================================== */
-        #task-screen { background-color: #eceff1; }
+    #hold-button {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 20;
+      width: 118px;
+      height: 118px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--ink);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-align: center;
+      user-select: none;
+      box-shadow: 0 5px 15px rgba(31, 48, 64, 0.25);
+      cursor: crosshair;
+    }
 
-        #trial-progress {
-            position: absolute;
-            top: 24px;
-            right: 24px;
-            background: rgba(255, 255, 255, 0.94);
-            color: #2c3e50;
-            border: 1px solid #d7dde2;
-            border-radius: 6px;
-            padding: 10px 14px;
-            font-weight: 700;
-            font-size: 1rem;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            z-index: 30;
-        }
+    #hold-button.feedback {
+      width: 148px;
+      height: 148px;
+      flex-direction: column;
+      line-height: 1.2;
+      padding: 16px;
+      font-size: 1rem;
+    }
 
-        #start-hold-btn {
-            position: absolute;
-            width: 120px;
-            height: 120px;
-            background: #2c3e50;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            user-select: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transform: translate(-50%, -50%); 
-            z-index: 10;
-        }
+    #hold-button.feedback small {
+      margin-top: 7px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      opacity: 0.92;
+    }
 
-        #start-hold-btn.accuracy-feedback {
-            width: 150px;
-            height: 150px;
-            flex-direction: column;
-            line-height: 1.2;
-            text-align: center;
-            font-size: 1.1rem;
-            cursor: var(--cursor-arrow);
-        }
+    .target {
+      position: absolute;
+      z-index: 10;
+      width: 112px;
+      height: 112px;
+      display: none;
+      transform: translate(-50%, -50%);
+      border: 3px solid var(--target-border);
+      border-radius: 50%;
+      background: var(--target);
+      box-shadow: 0 5px 13px rgba(31, 48, 64, 0.22);
+      cursor: crosshair;
+    }
 
-        #start-hold-btn.accuracy-feedback small {
-            display: block;
-            margin-top: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            opacity: 0.92;
-        }
+    .target::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.88);
+    }
 
-        .target {
-            position: absolute;
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            background: #3498db;
-            border: 3px solid #1f5f8b;
-            transform: translate(-50%, -50%);
-            display: none;
-            z-index: 5;
-            box-shadow: 0 6px 14px rgba(0,0,0,0.2);
-        }
+    @media (max-width: 650px) {
+      .panel {
+        padding: 24px;
+      }
 
-        #feedback {
-            position: absolute;
-            top: 20%;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 2rem;
-            font-weight: bold;
-            color: #2c3e50;
-            pointer-events: none;
-            display: none;
-            z-index: 20;
-        }
-    </style>
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #trial-progress {
+        top: 12px;
+        right: 12px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
 </head>
 <body>
+  <main id="welcome-screen" class="screen">
+    <section class="panel">
+      <h1>Target Hit Experiment</h1>
+      <p>Welcome. On each round, a button will appear in the center of the screen. Press and hold the center button, and keep your attention fixated on it until the targets appear.</p>
+      <p>You will complete <b>4 practice trials</b> first, followed by <b>40 main trials</b>.</p>
+      <p>Your goal is to click as close as possible to the exact center of a target.</p>
 
-    <div id="welcome-screen" class="screen" style="display: flex;">
-        <div class="container">
-            <h1>Target Hit Experiment</h1>
-            <p>Welcome! This is a target-hitting game. On each round, a button will appear in the center of the screen. <b>Press and hold</b> this center button. After a short delay, two targets will appear.</p>
-            <p>Your goal is to focus on hitting the <b>exact center</b> of one of the targets as accurately as possible. Take your time to be accurate.</p>
-            
-            <div class="form-grid">
-                <label class="full-width">Participant ID
-                    <input type="text" id="participant-id" placeholder="Leave blank to auto-generate">
-                </label>
-                <label>Dominant hand
-                    <select id="dominant-hand" required>
-                        <option value="">Select one</option>
-                        <option value="Right">Right</option>
-                        <option value="Left">Left</option>
-                        <option value="Ambidextrous">Ambidextrous</option>
-                    </select>
-                </label>
-            </div>
-            <button id="start-btn">Start Task</button>
-        </div>
+      <div class="form-grid">
+        <label class="full">Participant ID
+          <input id="participant-id" type="text" autocomplete="off" placeholder="Leave blank to auto-generate">
+        </label>
+        <label>Dominant hand
+          <select id="dominant-hand" required>
+            <option value="">Select one</option>
+            <option value="Right">Right</option>
+            <option value="Left">Left</option>
+            <option value="Ambidextrous">Ambidextrous</option>
+          </select>
+        </label>
+        <label>Gender
+          <select id="gender" required>
+            <option value="">Select one</option>
+            <option value="Woman">Woman</option>
+            <option value="Man">Man</option>
+            <option value="Non-binary">Non-binary</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+          </select>
+        </label>
+        <label>Age
+          <input id="age" type="number" min="0" max="120" placeholder="Optional">
+        </label>
+      </div>
+
+      <button id="start-button" type="button">Start Task</button>
+      <div id="start-error" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <section id="task-screen" class="screen">
+    <div id="trial-progress">Practice 1 of 4</div>
+    <div id="hold-button">Hold Me</div>
+    <div id="target-left" class="target"></div>
+    <div id="target-right" class="target"></div>
+  </section>
+
+  <section id="complete-screen" class="screen">
+    <div class="panel">
+      <h1>Thank you for participating.</h1>
+      <p>Your responses have been recorded.</p>
     </div>
+  </section>
 
-    <div id="task-screen" class="screen">
-        <div id="trial-progress">Practice 1 of 4</div>
-        <div id="feedback">Bullseye!</div>
-        <div id="start-hold-btn">Hold Me</div>
-        <div id="target-left" class="target"></div>
-        <div id="target-right" class="target"></div>
-    </div>
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwR9vPmUEjrhQUFNCVJayp9JfuVwtJtOW05InqxErFvYFLApxDUGxYO4L_Ybh8y6tQhlQ/exec";
 
-    <div id="results-screen" class="screen">
-        <div class="container">
-            <h1 id="final-message">Experiment Complete!</h1>
-            <p id="final-subtext">Calculating your results and fetching historical data...</p>
-            <div id="loading-indicator" class="loading-spinner">Processing... Please wait.</div>
-            
-            <div id="stats-grid" class="stats-grid">
-                <div class="stat-box">Mean Reaction Time <span class="stat-value" id="stat-rt">-- ms</span></div>
-                <div class="stat-box">Overall Accuracy <span class="stat-value" id="stat-acc">-- %</span></div>
-                <div class="stat-box">Left Choices <span class="stat-value" id="stat-left">-- %</span></div>
-                <div class="stat-box">Right Choices <span class="stat-value" id="stat-right">-- %</span></div>
-            </div>
+    const PRACTICE_TRIALS = 4;
+    const MAIN_TRIALS = 40;
+    const PAIRS = MAIN_TRIALS / 2;
+    const HOLD_MS = 500;
+    const HIT_RADIUS_PX = 5;
+    const CLEAR_ERROR_THRESHOLD_PX = 20;
+    const TARGET_SIZE_PX = 112;
 
-            <div id="chart-wrapper">
-                <canvas id="rtChart"></canvas>
-            </div>
-        </div>
-    </div>
+    const DISTANCE_LEVELS = {
+      0: 170,
+      1: 260,
+      2: 350,
+      3: 440
+    };
 
-    <script>
-        // ==========================================
-        // CONFIGURATION & PLACEHOLDERS
-        // ==========================================
-        
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec";
+    const SALIENCE_LEVELS = {
+      0: "blur(14px)",
+      1: "blur(8px)",
+      2: "blur(3px)",
+      3: "blur(0px)"
+    };
 
-        const MAIN_TRIALS = 40;
-        const PRACTICE_TRIALS = 4;
-        const POLICY_PROBE_PAIRS = 20;
-        const POST_MISS_ERROR_THRESHOLD_PX = 20;
-        const HOLD_DURATION_MS = 500;
-        const HIT_RADIUS_PX = 5; 
+    const CONDITION_LABELS = {
+      ERROR_MEASUREMENT: "Equal distance and equal salience",
+      POLICY_PROBE: "Closer less salient vs farther more salient",
+      PRACTICE: "Practice"
+    };
 
-        const DISTANCE_MAP = { 0: 170, 1: 280, 2: 390, 3: 500 };
-        const SALIENCE_MAP = { 0: "blur(18px)", 1: "blur(10px)", 2: "blur(4px)", 3: "blur(0px)" };
-        const CONDITION_LABELS = {
-            1: "Closer and more salient",
-            2: "Farther but more salient",
-            3: "Equal distance and equal salience",
-            4: "Equal salience, different distance",
-            5: "Equal distance, different salience"
-        };
+    let participantId = "";
+    let participantMeta = {};
+    let trialList = [];
+    let trialData = [];
+    let pendingRows = [];
+    let saveChain = Promise.resolve();
+    let currentTrialIndex = 0;
+    let holdTimer = null;
+    let holdStartTime = 0;
+    let targetOnsetTime = 0;
+    let lastMouseX = "";
+    let lastMouseY = "";
+    let cursorXAtTargetOnset = "";
+    let cursorYAtTargetOnset = "";
 
-        // Experiment State
-        let participantId = "";
-        let participantMeta = {};
-        let currentTrialIndex = 0;
-        let trialsData = [];
-        let trialList = []; 
-        let targetOnsetTime = 0;
-        let holdStartTime = 0;
-        let holdTimer = null;
-        let cursorXAtTargetOnset = "";
-        let cursorYAtTargetOnset = "";
-        let lastMouseX = "";
-        let lastMouseY = "";
+    const welcomeScreen = document.getElementById("welcome-screen");
+    const taskScreen = document.getElementById("task-screen");
+    const completeScreen = document.getElementById("complete-screen");
+    const startButton = document.getElementById("start-button");
+    const participantInput = document.getElementById("participant-id");
+    const dominantHandInput = document.getElementById("dominant-hand");
+    const genderInput = document.getElementById("gender");
+    const ageInput = document.getElementById("age");
+    const startError = document.getElementById("start-error");
+    const trialProgress = document.getElementById("trial-progress");
+    const holdButton = document.getElementById("hold-button");
+    const targetLeft = document.getElementById("target-left");
+    const targetRight = document.getElementById("target-right");
 
-        // User Summary Variables
-        let userMeanRT = 0;
+    startButton.addEventListener("click", startExperiment);
 
-        // DOM Elements
-        const welcomeScreen = document.getElementById("welcome-screen");
-        const taskScreen = document.getElementById("task-screen");
-        const resultsScreen = document.getElementById("results-screen");
-        const startBtn = document.getElementById("start-btn");
-        const partIdInput = document.getElementById("participant-id");
-        const dominantHandInput = document.getElementById("dominant-hand");
-        const holdBtn = document.getElementById("start-hold-btn");
-        const targetLeft = document.getElementById("target-left");
-        const targetRight = document.getElementById("target-right");
-        const feedbackEl = document.getElementById("feedback");
-        const trialProgressEl = document.getElementById("trial-progress");
+    document.addEventListener("mousemove", event => {
+      lastMouseX = event.clientX;
+      lastMouseY = event.clientY;
+    });
 
-        // ==========================================
-        // INITIALIZATION
-        // ==========================================
+    holdButton.addEventListener("mousedown", beginHold);
+    holdButton.addEventListener("mouseup", cancelHold);
+    holdButton.addEventListener("mouseleave", cancelHold);
+    targetLeft.addEventListener("mousedown", event => chooseTarget(0, event, targetLeft));
+    targetRight.addEventListener("mousedown", event => chooseTarget(1, event, targetRight));
 
-        startBtn.addEventListener("click", () => {
-            if (!dominantHandInput.value) {
-                dominantHandInput.focus();
-                dominantHandInput.reportValidity();
-                return;
-            }
+    function startExperiment() {
+      if (!dominantHandInput.value) {
+        startError.textContent = "Please select your dominant hand before starting.";
+        dominantHandInput.focus();
+        return;
+      }
 
-            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();
-            participantMeta = {
-                Dominant_Hand: dominantHandInput.value,
-                Viewport_Width: window.innerWidth,
-                Viewport_Height: window.innerHeight,
-                User_Agent: navigator.userAgent,
-                Experiment_Version: "post-error-policy-probe-v5"
-            };
-            generateTrials();
-            welcomeScreen.style.display = "none";
-            taskScreen.style.display = "block";
-            setupTaskArea();
-            startTrial();
+      if (!genderInput.value) {
+        startError.textContent = "Please select your gender before starting.";
+        genderInput.focus();
+        return;
+      }
+
+      if (ageInput.value && !ageInput.reportValidity()) {
+        startError.textContent = "Please enter an age between 0 and 120, or leave age blank.";
+        ageInput.focus();
+        return;
+      }
+
+      startError.textContent = "";
+      participantId = participantInput.value.trim() || `P${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      participantMeta = {
+        Dominant_Hand: dominantHandInput.value,
+        Gender: genderInput.value,
+        Age: ageInput.value.trim() === "" ? "" : Number(ageInput.value),
+        Experiment_Version: "post-error-policy-probe-clean-v1",
+        Viewport_Width: window.innerWidth,
+        Viewport_Height: window.innerHeight,
+        User_Agent: navigator.userAgent
+      };
+
+      trialList = buildTrialList();
+      currentTrialIndex = 0;
+      trialData = [];
+      pendingRows = [];
+
+      welcomeScreen.style.display = "none";
+      completeScreen.style.display = "none";
+      taskScreen.style.display = "block";
+      startTrial();
+    }
+
+    function buildTrialList() {
+      const practice = [
+        makeTrial("Practice", "Practice", 1, 1, 1, 1),
+        makeTrial("Practice", "Practice", 0, 2, 2, 1),
+        makeTrial("Practice", "Practice", 2, 0, 1, 2),
+        makeTrial("Practice", "Practice", 1, 1, 0, 3)
+      ];
+
+      const pairs = [];
+      for (let pairIndex = 0; pairIndex < PAIRS; pairIndex++) {
+        const pairNumber = pairIndex + 1;
+        const salientLeft = pairIndex % 2 === 0;
+        const errorTrial = makeTrial("Main", "Error measurement", 2, 2, 2, 2, {
+          Pair_Number: pairNumber,
+          Trial_In_Pair: 1
         });
 
-        // ==========================================
-        // TRIAL GENERATION & LOGIC
-        // ==========================================
-
-        function makeTrial(phase, dL, dR, sL, sR, options = {}) {
-            const conditionType = computeConditionType(dL, dR, sL, sR);
-            return {
-                phase,
-                dL,
-                dR,
-                sL,
-                sR,
-                conditionType,
-                conditionLabel: CONDITION_LABELS[conditionType],
-                expectedChoice: computeExpectedChoice(dL, dR, sL, sR),
-                trialRole: options.trialRole || "Standard",
-                pairNumber: options.pairNumber || "",
-                trialInPair: options.trialInPair || "",
-                probeSalientSide: options.probeSalientSide || ""
-            };
-        }
-
-        function generateTrials() {
-            const practiceTrials = [
-                makeTrial("Practice", 1, 1, 1, 1),
-                makeTrial("Practice", 0, 2, 2, 1),
-                makeTrial("Practice", 2, 0, 1, 2),
-                makeTrial("Practice", 1, 1, 0, 3)
-            ];
-
-            const pairs = [];
-            for (let i = 0; i < POLICY_PROBE_PAIRS; i++) {
-                const pairNumber = i + 1;
-                const salientLeft = i % 2 === 0;
-                const probeSalientSide = salientLeft ? "Left" : "Right";
-                const errorTrial = makeTrial("Main", 2, 2, 2, 2, {
-                    trialRole: "Error measurement",
-                    pairNumber,
-                    trialInPair: 1
-                });
-                const policyProbe = salientLeft
-                    ? makeTrial("Main", 3, 0, 3, 0, {
-                        trialRole: "Policy probe",
-                        pairNumber,
-                        trialInPair: 2,
-                        probeSalientSide
-                    })
-                    : makeTrial("Main", 0, 3, 0, 3, {
-                        trialRole: "Policy probe",
-                        pairNumber,
-                        trialInPair: 2,
-                        probeSalientSide
-                    });
-
-                pairs.push([errorTrial, policyProbe]);
-            }
-
-            const mainTrials = shuffle(pairs).flat();
-
-            if (practiceTrials.length !== PRACTICE_TRIALS || mainTrials.length !== MAIN_TRIALS) {
-                console.warn("Unexpected trial count", { practice: practiceTrials.length, main: mainTrials.length });
-            }
-
-            trialList = practiceTrials.concat(mainTrials);
-        }
-
-        function shuffle(items) {
-            return items
-                .map(value => ({ value, sort: Math.random() }))
-                .sort((a, b) => a.sort - b.sort)
-                .map(({ value }) => value);
-        }
-
-        function computeConditionType(dL, dR, sL, sR) {
-            const leftDistBetter = dL < dR;
-            const rightDistBetter = dR < dL;
-            const leftSalBetter = sL > sR;
-            const rightSalBetter = sR > sL;
-
-            if (dL === dR && sL === sR) return 3; 
-            if (dL !== dR && sL === sR) return 4; 
-            if (dL === dR && sL !== sR) return 5; 
-            if ((leftDistBetter && leftSalBetter) || (rightDistBetter && rightSalBetter)) return 1; 
-            if ((leftDistBetter && rightSalBetter) || (rightDistBetter && leftSalBetter)) return 2; 
-            return 3; 
-        }
-
-        function computeExpectedChoice(dL, dR, sL, sR) {
-            const leftDistBetter = dL < dR;
-            const rightDistBetter = dR < dL;
-            const leftSalBetter = sL > sR;
-            const rightSalBetter = sR > sL;
-
-            if ((leftDistBetter && leftSalBetter) || (leftDistBetter && sL === sR) || (dL === dR && leftSalBetter)) return 0;
-            if ((rightDistBetter && rightSalBetter) || (rightDistBetter && sL === sR) || (dL === dR && rightSalBetter)) return 1;
-            if ((leftDistBetter && rightSalBetter) || (rightDistBetter && leftSalBetter)) return "Conflict";
-            return "Random";
-        }
-
-        function choiceLabel(choiceCode) {
-            return choiceCode === 0 ? "Left" : "Right";
-        }
-
-        function expectedChoiceLabel(expectedChoice) {
-            if (expectedChoice === 0) return "Left";
-            if (expectedChoice === 1) return "Right";
-            if (expectedChoice === "Conflict") return "Conflict";
-            return "Random";
-        }
-
-        function choiceMatchesHand(choiceCode, handValue) {
-            if (!handValue || handValue === "Ambidextrous" || handValue === "Both") return "";
-            return choiceLabel(choiceCode) === handValue ? 1 : 0;
-        }
-
-        function choseCloserTarget(choiceCode, dL, dR) {
-            if (dL === dR) return "";
-            return (choiceCode === 0 && dL < dR) || (choiceCode === 1 && dR < dL) ? 1 : 0;
-        }
-
-        function choseMoreSalientTarget(choiceCode, sL, sR) {
-            if (sL === sR) return "";
-            return (choiceCode === 0 && sL > sR) || (choiceCode === 1 && sR > sL) ? 1 : 0;
-        }
-
-        function errorCategory(errorPx) {
-            if (errorPx <= HIT_RADIUS_PX) return "Hit";
-            if (errorPx < POST_MISS_ERROR_THRESHOLD_PX) return "Small error";
-            return "Clear error";
-        }
-
-        function chosenValue(choiceCode, leftValue, rightValue) {
-            return choiceCode === 0 ? leftValue : rightValue;
-        }
-
-        function getPreviousMainTrial() {
-            for (let i = trialsData.length - 1; i >= 0; i--) {
-                if (trialsData[i].Phase === "Main") return trialsData[i];
-            }
-            return null;
-        }
-
-        // ==========================================
-        // TASK EXECUTION
-        // ==========================================
-
-        function setupTaskArea() {
-            holdBtn.style.left = "50%";
-            holdBtn.style.top = "50%";
-            document.addEventListener("mousemove", (e) => {
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-            });
-            holdBtn.addEventListener("mousedown", handleHoldStart);
-            holdBtn.addEventListener("mouseup", handleHoldCancel);
-            holdBtn.addEventListener("mouseleave", handleHoldCancel);
-            targetLeft.addEventListener("mousedown", (e) => handleTargetClick(0, e, targetLeft));
-            targetRight.addEventListener("mousedown", (e) => handleTargetClick(1, e, targetRight));
-        }
-
-        function startTrial() {
-            if (currentTrialIndex >= trialList.length) {
-                endExperiment();
-                return;
-            }
-            const trial = trialList[currentTrialIndex];
-            targetLeft.style.display = "none";
-            targetRight.style.display = "none";
-            feedbackEl.style.display = "none";
-            updateTrialProgress(trial);
-            holdBtn.style.display = "flex";
-            holdBtn.classList.remove("accuracy-feedback");
-            holdBtn.innerHTML = trial.phase === "Practice" ? "Practice" : "Hold Me";
-            holdBtn.style.background = "#2c3e50";
-            // Important: Change cursor back to default crosshair/arrow during wait
-            document.body.style.cursor = "var(--cursor-arrow)"; 
-        }
-
-        function updateTrialProgress(trial) {
-            if (trial.phase === "Practice") {
-                const practiceIndex = currentTrialIndex + 1;
-                const practiceLeft = PRACTICE_TRIALS - practiceIndex;
-                trialProgressEl.innerText = `Practice ${practiceIndex} of ${PRACTICE_TRIALS} | ${practiceLeft} left`;
-                return;
-            }
-
-            const mainIndex = currentTrialIndex + 1 - PRACTICE_TRIALS;
-            const mainLeft = MAIN_TRIALS - mainIndex;
-            trialProgressEl.innerText = `Main ${mainIndex} of ${MAIN_TRIALS} | ${mainLeft} left`;
-        }
-
-        function handleHoldStart(event) {
-            if (holdBtn.classList.contains("accuracy-feedback")) return;
-            lastMouseX = event.clientX;
-            lastMouseY = event.clientY;
-            holdStartTime = performance.now();
-            holdBtn.style.background = "#27ae60"; 
-            holdTimer = setTimeout(showTargets, HOLD_DURATION_MS);
-        }
-
-        function handleHoldCancel() {
-            if (holdBtn.classList.contains("accuracy-feedback")) return;
-            if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = null;
-                holdBtn.style.background = "#c0392b"; 
-                holdBtn.innerHTML = "Hold!";
-                setTimeout(() => { if(holdBtn.style.display !== "none") holdBtn.style.background = "#2c3e50"; }, 300);
-            }
-        }
-
-        function showTargets() {
-            holdBtn.style.display = "none";
-            holdTimer = null;
-            
-            const trial = trialList[currentTrialIndex];
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-
-            const leftAngle = (180 + (Math.random() * 40 - 20)) * (Math.PI / 180);
-            const distLeftPx = DISTANCE_MAP[trial.dL];
-            const leftPosition = clampTargetPosition(
-                centerX + distLeftPx * Math.cos(leftAngle),
-                centerY + distLeftPx * Math.sin(leftAngle)
-            );
-            trial.leftAngleDeg = Math.round(leftAngle * 180 / Math.PI);
-            trial.leftX = Math.round(leftPosition.x);
-            trial.leftY = Math.round(leftPosition.y);
-            trial.leftActualDistancePx = Math.round(Math.hypot(leftPosition.x - centerX, leftPosition.y - centerY));
-            trial.leftWasClamped = trial.leftActualDistancePx !== distLeftPx ? 1 : 0;
-            targetLeft.style.left = `${leftPosition.x}px`;
-            targetLeft.style.top = `${leftPosition.y}px`;
-            targetLeft.style.filter = SALIENCE_MAP[trial.sL];
-            targetLeft.style.display = "block";
-
-            const rightAngle = (Math.random() * 40 - 20) * (Math.PI / 180);
-            const distRightPx = DISTANCE_MAP[trial.dR];
-            const rightPosition = clampTargetPosition(
-                centerX + distRightPx * Math.cos(rightAngle),
-                centerY + distRightPx * Math.sin(rightAngle)
-            );
-            trial.rightAngleDeg = Math.round(rightAngle * 180 / Math.PI);
-            trial.rightX = Math.round(rightPosition.x);
-            trial.rightY = Math.round(rightPosition.y);
-            trial.rightActualDistancePx = Math.round(Math.hypot(rightPosition.x - centerX, rightPosition.y - centerY));
-            trial.rightWasClamped = trial.rightActualDistancePx !== distRightPx ? 1 : 0;
-            targetRight.style.left = `${rightPosition.x}px`;
-            targetRight.style.top = `${rightPosition.y}px`;
-            targetRight.style.filter = SALIENCE_MAP[trial.sR];
-            targetRight.style.display = "block";
-
-            targetOnsetTime = performance.now();
-            cursorXAtTargetOnset = lastMouseX;
-            cursorYAtTargetOnset = lastMouseY;
-        }
-
-        function clampTargetPosition(x, y) {
-            const radius = targetLeft.offsetWidth / 2 || 125;
-            return {
-                x: Math.min(Math.max(x, radius), window.innerWidth - radius),
-                y: Math.min(Math.max(y, radius), window.innerHeight - radius)
-            };
-        }
-
-        function handleTargetClick(choiceCode, event, targetEl) {
-            const clickTime = performance.now();
-            const reactionTime = Math.round(clickTime - targetOnsetTime);
-            const trial = trialList[currentTrialIndex];
-            lastMouseX = event.clientX;
-            lastMouseY = event.clientY;
-            
-            const rect = targetEl.getBoundingClientRect();
-            const targetCenterX = rect.left + rect.width / 2;
-            const targetCenterY = rect.top + rect.height / 2;
-            
-            const distanceFromCenter = Math.hypot(event.clientX - targetCenterX, event.clientY - targetCenterY);
-            const errorPx = Math.round(distanceFromCenter);
-            const accuracy = distanceFromCenter <= HIT_RADIUS_PX ? 1 : 0;
-            const expectedChoice = trial.expectedChoice;
-            const expectedChoiceMatched = typeof expectedChoice === "number" ? (choiceCode === expectedChoice ? 1 : 0) : "";
-            const choseMoreSalient = choseMoreSalientTarget(choiceCode, trial.sL, trial.sR);
-            const previousMainTrial = getPreviousMainTrial();
-            const previousMainClearMiss = previousMainTrial && previousMainTrial.Error_From_Target_Center_Px >= POST_MISS_ERROR_THRESHOLD_PX ? 1 : 0;
-            const isPolicyProbe = trial.trialRole === "Policy probe";
-            const policyProbeAfterClearMiss = isPolicyProbe && previousMainTrial ? previousMainClearMiss : "";
-            const salientChoiceOnPolicyProbe = isPolicyProbe && choseMoreSalient !== "" ? choseMoreSalient : "";
-            const salientChoiceAfterClearMiss = isPolicyProbe && previousMainClearMiss && choseMoreSalient !== "" ? choseMoreSalient : "";
-            const movementStartX = cursorXAtTargetOnset === "" ? window.innerWidth / 2 : Number(cursorXAtTargetOnset);
-            const movementStartY = cursorYAtTargetOnset === "" ? window.innerHeight / 2 : Number(cursorYAtTargetOnset);
-            const movementAmplitudeToClick = Math.round(Math.hypot(event.clientX - movementStartX, event.clientY - movementStartY));
-            const actionCostToChosenTarget = Math.round(Math.hypot(targetCenterX - movementStartX, targetCenterY - movementStartY));
-            const movementVigor = reactionTime > 0 ? Math.round((movementAmplitudeToClick / reactionTime) * 1000) : "";
-            const currentErrorCategory = errorCategory(errorPx);
-            const pairedErrorPx = isPolicyProbe && previousMainTrial ? previousMainTrial.Error_From_Target_Center_Px : "";
-            const pairedErrorCategory = isPolicyProbe && previousMainTrial ? previousMainTrial.Local_Outcome_Category : "";
-
-            const trialRecord = {
-                Participant_ID: participantId,
-                Dominant_Hand: participantMeta.Dominant_Hand,
-                Experiment_Version: participantMeta.Experiment_Version,
-                Phase: trial.phase,
-                Trial_Role: trial.trialRole,
-                Pair_Number: trial.pairNumber,
-                Trial_In_Pair: trial.trialInPair,
-                Policy_Probe: isPolicyProbe ? 1 : 0,
-                Probe_Salient_Side: trial.probeSalientSide,
-                Probe_Salient_Is_Farther: isPolicyProbe ? 1 : "",
-                Trial_Number: currentTrialIndex + 1,
-                Main_Trial_Number: trial.phase === "Main" ? currentTrialIndex + 1 - PRACTICE_TRIALS : "",
-                Choice: choiceCode,
-                Choice_Label: choiceLabel(choiceCode),
-                Expected_Choice: expectedChoiceLabel(expectedChoice),
-                Expected_Choice_Matched: expectedChoiceMatched,
-                Chose_Closer_Target: choseCloserTarget(choiceCode, trial.dL, trial.dR),
-                Chose_More_Salient_Target: choseMoreSalient,
-                Policy_Shift_Toward_Perceptual_Reliability: salientChoiceOnPolicyProbe,
-                Previous_Main_Accuracy: previousMainTrial ? previousMainTrial.Accuracy : "",
-                Previous_Main_Error_Px: previousMainTrial ? previousMainTrial.Error_From_Target_Center_Px : "",
-                Previous_Main_Outcome_Category: previousMainTrial ? previousMainTrial.Local_Outcome_Category : "",
-                Previous_Main_Choice: previousMainTrial ? previousMainTrial.Choice_Label : "",
-                Previous_Main_Chose_More_Salient: previousMainTrial ? previousMainTrial.Chose_More_Salient_Target : "",
-                Previous_Main_Clear_Miss: previousMainTrial ? previousMainClearMiss : "",
-                Paired_Error_Px: pairedErrorPx,
-                Paired_Error_Category: pairedErrorCategory,
-                Policy_Probe_After_Clear_Miss: policyProbeAfterClearMiss,
-                Salient_Choice_On_Policy_Probe: salientChoiceOnPolicyProbe,
-                Salient_Choice_After_Clear_Miss: salientChoiceAfterClearMiss,
-                Post_Miss_Error_Threshold_Px: POST_MISS_ERROR_THRESHOLD_PX,
-                Choice_Matches_Dominant_Hand: choiceMatchesHand(choiceCode, participantMeta.Dominant_Hand),
-                Reaction_Time: reactionTime,
-                Hold_Duration: Math.round(targetOnsetTime - holdStartTime),
-                Movement_Amplitude_To_Click_Px: movementAmplitudeToClick,
-                Action_Cost_To_Chosen_Target_Px: actionCostToChosenTarget,
-                Movement_Vigor_Px_Per_Sec: movementVigor,
-                Accuracy: accuracy,
-                Local_Outcome_Category: currentErrorCategory,
-                Local_Clear_Error: errorPx >= POST_MISS_ERROR_THRESHOLD_PX ? 1 : 0,
-                Click_X: Math.round(event.clientX),
-                Click_Y: Math.round(event.clientY),
-                Cursor_X_At_Target_Onset: Math.round(movementStartX),
-                Cursor_Y_At_Target_Onset: Math.round(movementStartY),
-                Chosen_Target_Center_X: Math.round(targetCenterX),
-                Chosen_Target_Center_Y: Math.round(targetCenterY),
-                Error_From_Target_Center_Px: errorPx,
-                Target_Left_X: trial.leftX,
-                Target_Left_Y: trial.leftY,
-                Target_Right_X: trial.rightX,
-                Target_Right_Y: trial.rightY,
-                Target_Left_Actual_Distance_Px: trial.leftActualDistancePx,
-                Target_Right_Actual_Distance_Px: trial.rightActualDistancePx,
-                Target_Left_Clamped: trial.leftWasClamped,
-                Target_Right_Clamped: trial.rightWasClamped,
-                Target_Left_Angle_Deg: trial.leftAngleDeg,
-                Target_Right_Angle_Deg: trial.rightAngleDeg,
-                Distance_Left: trial.dL,
-                Distance_Right: trial.dR,
-                Salience_Left: trial.sL,
-                Salience_Right: trial.sR,
-                Chosen_Distance_Level: chosenValue(choiceCode, trial.dL, trial.dR),
-                Chosen_Salience_Level: chosenValue(choiceCode, trial.sL, trial.sR),
-                Chosen_Perceptual_Reliability_Level: chosenValue(choiceCode, trial.sL, trial.sR),
-                Distance_Difference: trial.dR - trial.dL,
-                Salience_Difference: trial.sL - trial.sR,
-                Condition_Type: trial.conditionType,
-                Condition_Label: trial.conditionLabel,
-                Viewport_Width: participantMeta.Viewport_Width,
-                Viewport_Height: participantMeta.Viewport_Height,
-                User_Agent: participantMeta.User_Agent,
-                Timestamp_ISO: new Date().toISOString()
-            };
-
-            trialsData.push(trialRecord);
-
-            targetLeft.style.display = "none";
-            targetRight.style.display = "none";
-            
-            showAccuracyFeedback(distanceFromCenter, accuracy);
-
-            currentTrialIndex++;
-            setTimeout(() => {
-                startTrial();
-            }, 1100); 
-        }
-
-        function showAccuracyFeedback(distanceFromCenter, accuracy) {
-            const errorPx = Math.round(distanceFromCenter);
-            let label = "Error recorded";
-            let color = "#5d6d7e";
-
-            if (accuracy === 1) {
-                label = "Hit registered";
-                color = "#2c3e50";
-            } else if (errorPx >= POST_MISS_ERROR_THRESHOLD_PX) {
-                label = "Clear error recorded";
-                color = "#7f8c8d";
-            } else if (errorPx <= 60) {
-                label = "Small error recorded";
-                color = "#5d6d7e";
-            }
-
-            holdBtn.classList.add("accuracy-feedback");
-            holdBtn.style.display = "flex";
-            holdBtn.style.background = color;
-            holdBtn.innerHTML = `${label}<small>${errorPx}px from center</small>`;
-        }
-
-        // ==========================================
-        // DATA SUBMISSION & DASHBOARD RENDERING
-        // ==========================================
-
-        async function endExperiment() {
-            // 1. Show results screen UI state
-            document.body.style.cursor = "default";
-            taskScreen.style.display = "none";
-            resultsScreen.style.display = "flex";
-            const loadingIndicator = document.getElementById("loading-indicator");
-
-            // 2. Calculate current participant's summary
-            calculateUserSummary();
-
-            if (WEB_APP_URL === "YOUR_WEB_APP_URL_HERE") {
-                document.getElementById("final-subtext").innerHTML = "Data not saved/fetched: <i>WEB_APP_URL</i> was not configured.<br>Check console for your current data.";
-                loadingIndicator.style.display = "none";
-                document.getElementById("stats-grid").style.display = "grid";
-                console.log(JSON.stringify(trialsData, null, 2));
-                return;
-            }
-
-            try {
-                // 3. POST data to save
-                await fetch(WEB_APP_URL, {
-                    method: "POST",
-                    body: JSON.stringify(trialsData)
-                });
-
-                document.getElementById("final-subtext").innerText = "Your data was saved. Fetching community statistics...";
-
-                // 4. GET historical data
-                const response = await fetch(WEB_APP_URL);
-                const result = await response.json();
-
-                if(result.status === "success" && result.data && result.data.length > 0) {
-                    renderHistogram(result.data);
-                } else {
-                    throw new Error("No historical data found or empty response.");
-                }
-
-                document.getElementById("final-subtext").innerText = "Here is how you compare to overall history!";
-
-            } catch (error) {
-                console.error("Network/Fetch error:", error);
-                document.getElementById("final-subtext").innerText = "Your summary is below. (Could not load historical chart data).";
-            } finally {
-                // Hide loading, show stats and chart
-                loadingIndicator.style.display = "none";
-                document.getElementById("stats-grid").style.display = "grid";
-            }
-        }
-
-        function calculateUserSummary() {
-            const mainTrials = trialsData.filter(t => t.Phase === "Main");
-            const total = mainTrials.length;
-            if (total === 0) return;
-
-            let sumRT = 0;
-            let sumAcc = 0;
-            let sumLeft = 0;
-            let sumRight = 0;
-
-            mainTrials.forEach(t => {
-                sumRT += t.Reaction_Time;
-                sumAcc += t.Accuracy;
-                if(t.Choice === 0) sumLeft++;
-                if(t.Choice === 1) sumRight++;
+        const probeTrial = salientLeft
+          ? makeTrial("Main", "Policy probe", 3, 0, 3, 0, {
+              Pair_Number: pairNumber,
+              Trial_In_Pair: 2,
+              Probe_Salient_Side: "Left"
+            })
+          : makeTrial("Main", "Policy probe", 0, 3, 0, 3, {
+              Pair_Number: pairNumber,
+              Trial_In_Pair: 2,
+              Probe_Salient_Side: "Right"
             });
 
-            userMeanRT = Math.round(sumRT / total);
-            const accPerc = Math.round((sumAcc / total) * 100);
-            const leftPerc = Math.round((sumLeft / total) * 100);
-            const rightPerc = Math.round((sumRight / total) * 100);
+        pairs.push([errorTrial, probeTrial]);
+      }
 
-            document.getElementById("stat-rt").innerText = `${userMeanRT} ms`;
-            document.getElementById("stat-acc").innerText = `${accPerc} %`;
-            document.getElementById("stat-left").innerText = `${leftPerc} %`;
-            document.getElementById("stat-right").innerText = `${rightPerc} %`;
+      return practice.concat(shuffle(pairs).flat());
+    }
+
+    function makeTrial(phase, role, distanceLeft, distanceRight, salienceLeft, salienceRight, extra = {}) {
+      return {
+        Phase: phase,
+        Trial_Role: role,
+        Distance_Left: distanceLeft,
+        Distance_Right: distanceRight,
+        Salience_Left: salienceLeft,
+        Salience_Right: salienceRight,
+        Condition_Label: role === "Policy probe"
+          ? CONDITION_LABELS.POLICY_PROBE
+          : role === "Error measurement"
+            ? CONDITION_LABELS.ERROR_MEASUREMENT
+            : CONDITION_LABELS.PRACTICE,
+        ...extra
+      };
+    }
+
+    function shuffle(items) {
+      return items
+        .map(value => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(item => item.value);
+    }
+
+    function startTrial() {
+      if (currentTrialIndex >= trialList.length) {
+        finishExperiment();
+        return;
+      }
+
+      const trial = trialList[currentTrialIndex];
+      hideTargets();
+      updateProgress(trial);
+      holdButton.classList.remove("feedback");
+      holdButton.style.display = "flex";
+      holdButton.style.background = "var(--ink)";
+      holdButton.innerHTML = trial.Phase === "Practice" ? "Practice" : "Hold Me";
+    }
+
+    function updateProgress(trial) {
+      if (trial.Phase === "Practice") {
+        const index = currentTrialIndex + 1;
+        trialProgress.textContent = `Practice ${index} of ${PRACTICE_TRIALS} | ${PRACTICE_TRIALS - index} left`;
+        return;
+      }
+
+      const mainIndex = currentTrialIndex + 1 - PRACTICE_TRIALS;
+      trialProgress.textContent = `Main ${mainIndex} of ${MAIN_TRIALS} | ${MAIN_TRIALS - mainIndex} left`;
+    }
+
+    function beginHold(event) {
+      if (holdButton.classList.contains("feedback")) return;
+      lastMouseX = event.clientX;
+      lastMouseY = event.clientY;
+      holdStartTime = performance.now();
+      holdButton.style.background = "var(--ok)";
+      holdTimer = setTimeout(showTargets, HOLD_MS);
+    }
+
+    function cancelHold() {
+      if (holdButton.classList.contains("feedback")) return;
+      if (!holdTimer) return;
+      clearTimeout(holdTimer);
+      holdTimer = null;
+      holdButton.style.background = "var(--error)";
+      holdButton.textContent = "Hold";
+      setTimeout(() => {
+        if (holdButton.style.display !== "none") {
+          holdButton.style.background = "var(--ink)";
         }
+      }, 250);
+    }
 
-        function renderHistogram(historicalData) {
-            // Extract all numeric Reaction Times
-            const allRTs = historicalData
-                .filter(row => row.Phase !== "Practice")
-                .map(row => Number(row.Reaction_Time))
-                .filter(rt => !isNaN(rt) && rt > 0);
+    function showTargets() {
+      holdTimer = null;
+      holdButton.style.display = "none";
 
-            if (allRTs.length === 0) return;
+      const trial = trialList[currentTrialIndex];
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      const leftAngle = degreesToRadians(180 + randomBetween(-18, 18));
+      const rightAngle = degreesToRadians(randomBetween(-18, 18));
+      const leftPosition = positionTarget(centerX, centerY, DISTANCE_LEVELS[trial.Distance_Left], leftAngle);
+      const rightPosition = positionTarget(centerX, centerY, DISTANCE_LEVELS[trial.Distance_Right], rightAngle);
 
-            // Define bins (e.g., 50ms intervals)
-            const binSize = 50;
-            const minRT = Math.floor(Math.min(...allRTs) / binSize) * binSize;
-            // Cap visual max to 99th percentile to prevent extreme outliers skewing the chart
-            const sortedRTs = [...allRTs].sort((a,b) => a-b);
-            const p99 = sortedRTs[Math.floor(sortedRTs.length * 0.99)] || sortedRTs[sortedRTs.length-1];
-            let maxRT = Math.ceil(p99 / binSize) * binSize;
-            
-            // Ensure the user's mean RT fits on the chart
-            if (userMeanRT > maxRT) maxRT = Math.ceil(userMeanRT / binSize) * binSize;
+      placeTarget(targetLeft, leftPosition, trial.Salience_Left);
+      placeTarget(targetRight, rightPosition, trial.Salience_Right);
 
-            const bins = [];
-            const labels = [];
-            
-            for (let i = minRT; i <= maxRT; i += binSize) {
-                bins.push(0);
-                labels.push(`${i}-${i+binSize}`);
-            }
+      Object.assign(trial, {
+        Target_Left_X: Math.round(leftPosition.x),
+        Target_Left_Y: Math.round(leftPosition.y),
+        Target_Right_X: Math.round(rightPosition.x),
+        Target_Right_Y: Math.round(rightPosition.y),
+        Target_Left_Actual_Distance_Px: Math.round(Math.hypot(leftPosition.x - centerX, leftPosition.y - centerY)),
+        Target_Right_Actual_Distance_Px: Math.round(Math.hypot(rightPosition.x - centerX, rightPosition.y - centerY)),
+        Target_Left_Angle_Deg: Math.round(radiansToDegrees(leftAngle)),
+        Target_Right_Angle_Deg: Math.round(radiansToDegrees(rightAngle))
+      });
 
-            // Populate frequencies
-            allRTs.forEach(rt => {
-                if (rt >= minRT && rt <= maxRT + binSize) { // include if within bounds
-                    let index = Math.floor((rt - minRT) / binSize);
-                    if (index >= bins.length) index = bins.length - 1;
-                    if (index < 0) index = 0;
-                    bins[index]++;
-                }
-            });
+      cursorXAtTargetOnset = lastMouseX === "" ? centerX : lastMouseX;
+      cursorYAtTargetOnset = lastMouseY === "" ? centerY : lastMouseY;
+      targetOnsetTime = performance.now();
+    }
 
-            // Find which bin the current participant belongs to for highlighting
-            let userBinIndex = Math.floor((userMeanRT - minRT) / binSize);
-            if (userBinIndex < 0) userBinIndex = 0;
-            if (userBinIndex >= bins.length) userBinIndex = bins.length - 1;
+    function placeTarget(target, position, salienceLevel) {
+      target.style.left = `${position.x}px`;
+      target.style.top = `${position.y}px`;
+      target.style.filter = SALIENCE_LEVELS[salienceLevel];
+      target.style.display = "block";
+    }
 
-            // Colors: standard blue, but the user's bin is distinct red
-            const backgroundColors = bins.map((_, i) => 
-                i === userBinIndex ? 'rgba(231, 76, 60, 0.9)' : 'rgba(52, 152, 219, 0.6)'
-            );
-            const borderColors = bins.map((_, i) => 
-                i === userBinIndex ? 'rgba(192, 57, 43, 1)' : 'rgba(41, 128, 185, 1)'
-            );
+    function positionTarget(centerX, centerY, distancePx, angle) {
+      const radius = TARGET_SIZE_PX / 2 + 8;
+      const x = centerX + distancePx * Math.cos(angle);
+      const y = centerY + distancePx * Math.sin(angle);
+      return {
+        x: Math.min(Math.max(x, radius), window.innerWidth - radius),
+        y: Math.min(Math.max(y, radius), window.innerHeight - radius)
+      };
+    }
 
-            // Show chart container
-            document.getElementById("chart-wrapper").style.display = "block";
+    function chooseTarget(choiceCode, event, target) {
+      const clickTime = performance.now();
+      const trial = trialList[currentTrialIndex];
+      const rect = target.getBoundingClientRect();
+      const targetCenterX = rect.left + rect.width / 2;
+      const targetCenterY = rect.top + rect.height / 2;
+      const errorPx = Math.round(Math.hypot(event.clientX - targetCenterX, event.clientY - targetCenterY));
+      const accuracy = errorPx <= HIT_RADIUS_PX ? 1 : 0;
+      const previousMain = getPreviousMainTrial();
+      const isProbe = trial.Trial_Role === "Policy probe";
+      const choseMoreSalient = choseMoreSalientTarget(choiceCode, trial.Salience_Left, trial.Salience_Right);
+      const movementStartX = Number(cursorXAtTargetOnset);
+      const movementStartY = Number(cursorYAtTargetOnset);
+      const movementAmplitude = Math.round(Math.hypot(event.clientX - movementStartX, event.clientY - movementStartY));
+      const actionCost = Math.round(Math.hypot(targetCenterX - movementStartX, targetCenterY - movementStartY));
+      const reactionTime = Math.round(clickTime - targetOnsetTime);
+      const previousClearError = previousMain && previousMain.Error_From_Target_Center_Px >= CLEAR_ERROR_THRESHOLD_PX ? 1 : 0;
 
-            // Render Chart
-            const ctx = document.getElementById('rtChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Historical Frequency',
-                        data: bins,
-                        backgroundColor: backgroundColors,
-                        borderColor: borderColors,
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Reaction Time Distribution (Red bar indicates your mean performance)',
-                            font: { size: 16 }
-                        },
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = `Frequency: ${context.parsed.y}`;
-                                    if (context.dataIndex === userBinIndex) {
-                                        label += ' (Your Mean RT falls here)';
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Reaction Time (ms)',
-                                font: { weight: 'bold' }
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Frequency (Number of Trials)',
-                                font: { weight: 'bold' }
-                            },
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
+      const row = {
+        Participant_ID: participantId,
+        Dominant_Hand: participantMeta.Dominant_Hand,
+        Gender: participantMeta.Gender,
+        Age: participantMeta.Age,
+        Experiment_Version: participantMeta.Experiment_Version,
+        Phase: trial.Phase,
+        Trial_Number: currentTrialIndex + 1,
+        Main_Trial_Number: trial.Phase === "Main" ? currentTrialIndex + 1 - PRACTICE_TRIALS : "",
+        Trial_Role: trial.Trial_Role,
+        Pair_Number: trial.Pair_Number || "",
+        Trial_In_Pair: trial.Trial_In_Pair || "",
+        Condition_Label: trial.Condition_Label,
+        Policy_Probe: isProbe ? 1 : 0,
+        Probe_Salient_Side: trial.Probe_Salient_Side || "",
+        Probe_Salient_Is_Farther: isProbe ? 1 : "",
+        Choice: choiceCode,
+        Choice_Label: choiceCode === 0 ? "Left" : "Right",
+        Chose_Closer_Target: choseCloserTarget(choiceCode, trial.Distance_Left, trial.Distance_Right),
+        Chose_More_Salient_Target: choseMoreSalient,
+        Policy_Shift_Toward_Perceptual_Reliability: isProbe ? choseMoreSalient : "",
+        Previous_Main_Accuracy: previousMain ? previousMain.Accuracy : "",
+        Previous_Main_Error_Px: previousMain ? previousMain.Error_From_Target_Center_Px : "",
+        Previous_Main_Outcome_Category: previousMain ? previousMain.Local_Outcome_Category : "",
+        Previous_Main_Clear_Error: previousMain ? previousClearError : "",
+        Policy_Probe_After_Clear_Error: isProbe && previousMain ? previousClearError : "",
+        Salient_Choice_After_Clear_Error: isProbe && previousClearError ? choseMoreSalient : "",
+        Clear_Error_Threshold_Px: CLEAR_ERROR_THRESHOLD_PX,
+        Hit_Radius_Px: HIT_RADIUS_PX,
+        Reaction_Time_Ms: reactionTime,
+        Hold_Duration_Ms: Math.round(targetOnsetTime - holdStartTime),
+        Movement_Amplitude_To_Click_Px: movementAmplitude,
+        Action_Cost_To_Chosen_Target_Px: actionCost,
+        Movement_Vigor_Px_Per_Sec: reactionTime > 0 ? Math.round((movementAmplitude / reactionTime) * 1000) : "",
+        Accuracy: accuracy,
+        Local_Outcome_Category: outcomeCategory(errorPx),
+        Local_Clear_Error: errorPx >= CLEAR_ERROR_THRESHOLD_PX ? 1 : 0,
+        Click_X: Math.round(event.clientX),
+        Click_Y: Math.round(event.clientY),
+        Cursor_X_At_Target_Onset: Math.round(movementStartX),
+        Cursor_Y_At_Target_Onset: Math.round(movementStartY),
+        Chosen_Target_Center_X: Math.round(targetCenterX),
+        Chosen_Target_Center_Y: Math.round(targetCenterY),
+        Error_From_Target_Center_Px: errorPx,
+        Distance_Left: trial.Distance_Left,
+        Distance_Right: trial.Distance_Right,
+        Salience_Left: trial.Salience_Left,
+        Salience_Right: trial.Salience_Right,
+        Chosen_Distance_Level: choiceCode === 0 ? trial.Distance_Left : trial.Distance_Right,
+        Chosen_Salience_Level: choiceCode === 0 ? trial.Salience_Left : trial.Salience_Right,
+        Distance_Difference_Right_Minus_Left: trial.Distance_Right - trial.Distance_Left,
+        Salience_Difference_Left_Minus_Right: trial.Salience_Left - trial.Salience_Right,
+        Target_Left_X: trial.Target_Left_X,
+        Target_Left_Y: trial.Target_Left_Y,
+        Target_Right_X: trial.Target_Right_X,
+        Target_Right_Y: trial.Target_Right_Y,
+        Target_Left_Actual_Distance_Px: trial.Target_Left_Actual_Distance_Px,
+        Target_Right_Actual_Distance_Px: trial.Target_Right_Actual_Distance_Px,
+        Target_Left_Angle_Deg: trial.Target_Left_Angle_Deg,
+        Target_Right_Angle_Deg: trial.Target_Right_Angle_Deg,
+        Viewport_Width: participantMeta.Viewport_Width,
+        Viewport_Height: participantMeta.Viewport_Height,
+        User_Agent: participantMeta.User_Agent,
+        Timestamp_ISO: new Date().toISOString()
+      };
+
+      trialData.push(row);
+      queueTrialSave(row);
+      hideTargets();
+      showFeedback(errorPx, accuracy);
+      currentTrialIndex++;
+      setTimeout(startTrial, 950);
+    }
+
+    function hideTargets() {
+      targetLeft.style.display = "none";
+      targetRight.style.display = "none";
+    }
+
+    function showFeedback(errorPx, accuracy) {
+      let message = "Error recorded";
+      let color = "var(--warn)";
+
+      if (accuracy) {
+        message = "Hit registered";
+        color = "var(--ink)";
+      } else if (errorPx >= CLEAR_ERROR_THRESHOLD_PX) {
+        message = "Clear error recorded";
+      } else {
+        message = "Small error recorded";
+      }
+
+      holdButton.classList.add("feedback");
+      holdButton.style.display = "flex";
+      holdButton.style.background = color;
+      holdButton.innerHTML = `${message}<small>${errorPx}px from center</small>`;
+    }
+
+    function getPreviousMainTrial() {
+      for (let i = trialData.length - 1; i >= 0; i--) {
+        if (trialData[i].Phase === "Main") return trialData[i];
+      }
+      return null;
+    }
+
+    function choseCloserTarget(choiceCode, leftDistance, rightDistance) {
+      if (leftDistance === rightDistance) return "";
+      return (choiceCode === 0 && leftDistance < rightDistance) || (choiceCode === 1 && rightDistance < leftDistance) ? 1 : 0;
+    }
+
+    function choseMoreSalientTarget(choiceCode, leftSalience, rightSalience) {
+      if (leftSalience === rightSalience) return "";
+      return (choiceCode === 0 && leftSalience > rightSalience) || (choiceCode === 1 && rightSalience > leftSalience) ? 1 : 0;
+    }
+
+    function outcomeCategory(errorPx) {
+      if (errorPx <= HIT_RADIUS_PX) return "Hit";
+      if (errorPx < CLEAR_ERROR_THRESHOLD_PX) return "Small error";
+      return "Clear error";
+    }
+
+    function queueTrialSave(row) {
+      if (!WEB_APP_URL || WEB_APP_URL.includes("YOUR_WEB_APP_URL")) return;
+      pendingRows.push(row);
+      saveChain = saveChain.then(flushPendingRows);
+    }
+
+    async function flushPendingRows() {
+      while (pendingRows.length > 0) {
+        const row = pendingRows[0];
+        try {
+          await fetch(WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors",
+            keepalive: true,
+            body: JSON.stringify([row])
+          });
+          pendingRows.shift();
+        } catch (error) {
+          console.error("Trial save failed; will retry later.", error);
+          break;
         }
-    </script>
+      }
+    }
+
+    async function finishExperiment() {
+      taskScreen.style.display = "none";
+      completeScreen.style.display = "flex";
+      try {
+        await saveChain;
+        if (pendingRows.length > 0) {
+          await flushPendingRows();
+        }
+      } catch (error) {
+        console.error("Final save attempt failed.", error);
+      }
+    }
+
+    function randomBetween(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function degreesToRadians(degrees) {
+      return degrees * Math.PI / 180;
+    }
+
+    function radiansToDegrees(radians) {
+      return radians * 180 / Math.PI;
+    }
+  </script>
 </body>
 </html>
