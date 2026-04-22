@@ -43,13 +43,20 @@
 
     #welcome-screen,
     #complete-screen {
-      display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
       overflow-y: auto;
       background: var(--panel);
       cursor: default;
+    }
+
+    #welcome-screen {
+      display: flex;
+    }
+
+    #complete-screen {
+      display: none;
     }
 
     .panel {
@@ -347,6 +354,7 @@
     const targetRight = document.getElementById("target-right");
 
     startButton.addEventListener("click", startExperiment);
+    showWelcomeScreen();
 
     document.addEventListener("mousemove", event => {
       lastMouseX = event.clientX;
@@ -395,9 +403,7 @@
       trialData = [];
       pendingRows = [];
 
-      welcomeScreen.style.display = "none";
-      completeScreen.style.display = "none";
-      taskScreen.style.display = "block";
+      showTaskScreen();
       startTrial();
     }
 
@@ -721,8 +727,7 @@
     }
 
     async function finishExperiment() {
-      taskScreen.style.display = "none";
-      completeScreen.style.display = "flex";
+      showCompleteScreen();
       try {
         await saveChain;
         if (pendingRows.length > 0) {
@@ -743,6 +748,24 @@
 
     function radiansToDegrees(radians) {
       return radians * 180 / Math.PI;
+    }
+
+    function showWelcomeScreen() {
+      welcomeScreen.style.display = "flex";
+      taskScreen.style.display = "none";
+      completeScreen.style.display = "none";
+    }
+
+    function showTaskScreen() {
+      welcomeScreen.style.display = "none";
+      taskScreen.style.display = "block";
+      completeScreen.style.display = "none";
+    }
+
+    function showCompleteScreen() {
+      welcomeScreen.style.display = "none";
+      taskScreen.style.display = "none";
+      completeScreen.style.display = "flex";
     }
   </script>
 </body>
