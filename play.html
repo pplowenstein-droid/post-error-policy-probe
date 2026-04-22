@@ -25,6 +25,13 @@
       return html;
     }
 
+    function patchInstructions(html) {
+      return html.replace(
+        `Welcome! This is a target-hitting game. On each round, a button will appear in the center of the screen. <b>Press and hold</b> this center button. After a short delay, two targets will appear.`,
+        `Welcome! This is a target-hitting game. On each round, a button will appear in the center of the screen. <b>Press and hold</b> this center button, and keep your attention fixated on the button until the targets appear.`
+      );
+    }
+
     function patchTrialSaving(html) {
       html = html.replace(
         "let trialsData = [];\n        let trialList = [];",
@@ -318,7 +325,7 @@
       .then(response => response.text())
       .then(html => {
         document.open();
-        document.write(patchThankYouOnly(patchDemographics(patchTrialSaving(patchEndpoint(html)))));
+        document.write(patchThankYouOnly(patchDemographics(patchTrialSaving(patchInstructions(patchEndpoint(html))))));
         document.close();
       })
       .catch(error => {
