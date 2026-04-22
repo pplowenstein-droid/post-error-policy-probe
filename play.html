@@ -75,12 +75,92 @@
       return html;
     }
 
+    function applyGenderRequirement(html) {
+      if (html.includes('id="gender"')) return html;
+
+      html = html.replace(
+        `                <label>Dominant hand
+                    <select id="dominant-hand" required>
+                        <option value="">Select one</option>
+                        <option value="Right">Right</option>
+                        <option value="Left">Left</option>
+                        <option value="Ambidextrous">Ambidextrous</option>
+                    </select>
+                </label>`,
+        `                <label>Dominant hand
+                    <select id="dominant-hand" required>
+                        <option value="">Select one</option>
+                        <option value="Right">Right</option>
+                        <option value="Left">Left</option>
+                        <option value="Ambidextrous">Ambidextrous</option>
+                    </select>
+                </label>
+                <label>Gender
+                    <select id="gender" required>
+                        <option value="">Select one</option>
+                        <option value="Woman">Woman</option>
+                        <option value="Man">Man</option>
+                        <option value="Non-binary">Non-binary</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                </label>`
+      );
+
+      html = html.replace(
+        `        const dominantHandInput = document.getElementById("dominant-hand");`,
+        `        const dominantHandInput = document.getElementById("dominant-hand");
+        const genderInput = document.getElementById("gender");`
+      );
+
+      html = html.replace(
+        `            if (!dominantHandInput.value) {
+                dominantHandInput.focus();
+                dominantHandInput.reportValidity();
+                return;
+            }
+
+            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`,
+        `            if (!dominantHandInput.value) {
+                dominantHandInput.focus();
+                dominantHandInput.reportValidity();
+                return;
+            }
+            if (!genderInput.value) {
+                genderInput.focus();
+                genderInput.reportValidity();
+                return;
+            }
+
+            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`
+      );
+
+      html = html.replace(
+        `                Dominant_Hand: dominantHandInput.value,
+                Viewport_Width: window.innerWidth,`,
+        `                Dominant_Hand: dominantHandInput.value,
+                Gender: genderInput.value,
+                Viewport_Width: window.innerWidth,`
+      );
+
+      html = html.replace(
+        `                Participant_ID: participantId,
+                Dominant_Hand: participantMeta.Dominant_Hand,
+                Experiment_Version: participantMeta.Experiment_Version,`,
+        `                Participant_ID: participantId,
+                Dominant_Hand: participantMeta.Dominant_Hand,
+                Gender: participantMeta.Gender,
+                Experiment_Version: participantMeta.Experiment_Version,`
+      );
+
+      return html;
+    }
+
     fetch("index.html", { cache: "no-store" })
       .then(response => response.text())
       .then(html => {
         document.open();
         const endpointPatched = html.replace(OLD_ENDPOINT, NEW_ENDPOINT).replace(CURRENT_ENDPOINT, NEW_ENDPOINT);
-        document.write(applyTrialByTrialSaving(endpointPatched));
+        document.write(applyGenderRequirement(applyTrialByTrialSaving(endpointPatched)));
         document.close();
       })
       .catch(error => {
