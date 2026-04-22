@@ -8,7 +8,8 @@
 <body>
   <script>
     const OLD_ENDPOINT = "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec";
-    const NEW_ENDPOINT = "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec";
+    const CURRENT_ENDPOINT = "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec";
+    const NEW_ENDPOINT = "https://script.google.com/macros/s/AKfycbzVKtOL9hKZmx2VJLulkScCUTUk0GpZ2qIWa4mItzVB5z88-eETyQHoJTiQTmEDLeNMlQ/exec";
 
     function applyTrialByTrialSaving(html) {
       html = html.replace(
@@ -78,7 +79,8 @@
       .then(response => response.text())
       .then(html => {
         document.open();
-        document.write(applyTrialByTrialSaving(html.replace(OLD_ENDPOINT, NEW_ENDPOINT)));
+        const endpointPatched = html.replace(OLD_ENDPOINT, NEW_ENDPOINT).replace(CURRENT_ENDPOINT, NEW_ENDPOINT);
+        document.write(applyTrialByTrialSaving(endpointPatched));
         document.close();
       })
       .catch(error => {
