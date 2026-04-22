@@ -26,10 +26,15 @@
     }
 
     function patchInstructions(html) {
-      return html.replace(
+      html = html.replace(
         `Welcome! This is a target-hitting game. On each round, a button will appear in the center of the screen. <b>Press and hold</b> this center button. After a short delay, two targets will appear.`,
         `Welcome! This is a target-hitting game. On each round, a button will appear in the center of the screen. <b>Press and hold</b> this center button, and keep your attention fixated on the button until the targets appear.`
       );
+      html = html.replace(
+        `<p>Your goal is to focus on hitting the <b>exact center</b> of one of the targets as accurately as possible. Take your time to be accurate.</p>`,
+        `<p>You will complete <b>4 practice trials</b> first, followed by <b>40 main trials</b>.</p>\n            <p>Your goal is to focus on hitting the <b>exact center</b> of one of the targets as accurately as possible. Take your time to be accurate.</p>`
+      );
+      return html;
     }
 
     function patchTrialSaving(html) {
