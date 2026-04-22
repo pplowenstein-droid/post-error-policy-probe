@@ -10,11 +10,75 @@
     const OLD_ENDPOINT = "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec";
     const NEW_ENDPOINT = "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec";
 
+    function applyTrialByTrialSaving(html) {
+      html = html.replace(
+        "let trialsData = [];\n        let trialList = [];",
+        "let trialsData = [];\n        let pendingTrialRecords = [];\n        let trialSubmissionChain = Promise.resolve();\n        let trialList = [];"
+      );
+
+      html = html.replace(
+        "trialsData.push(trialRecord);\n\n            targetLeft.style.display = \"none\";",
+        "trialsData.push(trialRecord);\n            queueTrialSubmission(trialRecord);\n\n            targetLeft.style.display = \"none\";"
+      );
+
+      html = html.replace(
+        "        async function endExperiment() {",
+        `        function queueTrialSubmission(trialRecord) {
+            if (WEB_APP_URL === "YOUR_WEB_APP_URL_HERE") return;
+
+            pendingTrialRecords.push(trialRecord);
+            trialSubmissionChain = trialSubmissionChain.then(flushPendingTrialRecords);
+            return trialSubmissionChain;
+        }
+
+        async function flushPendingTrialRecords() {
+            while (pendingTrialRecords.length > 0) {
+                const nextRecord = pendingTrialRecords[0];
+                try {
+                    await fetch(WEB_APP_URL, {
+                        method: "POST",
+                        body: JSON.stringify([nextRecord])
+                    });
+                    pendingTrialRecords.shift();
+                } catch (error) {
+                    console.error("Trial-by-trial save failed; will retry at task end:", error);
+                    break;
+                }
+            }
+        }
+
+        async function endExperiment() {`
+      );
+
+      html = html.replace(
+        `                // 3. POST data to save
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    body: JSON.stringify(trialsData)
+                });
+
+                document.getElementById("final-subtext").innerText = "Your data was saved. Fetching community statistics...";`,
+        `                // 3. Wait for any trial-by-trial saves still in progress.
+                await trialSubmissionChain;
+                if (pendingTrialRecords.length > 0) {
+                    await flushPendingTrialRecords();
+                }
+
+                if (pendingTrialRecords.length > 0) {
+                    document.getElementById("final-subtext").innerText = "Your summary is below. Some trial rows could not be saved yet.";
+                } else {
+                    document.getElementById("final-subtext").innerText = "Your trial data was saved. Fetching community statistics...";
+                }`
+      );
+
+      return html;
+    }
+
     fetch("index.html", { cache: "no-store" })
       .then(response => response.text())
       .then(html => {
         document.open();
-        document.write(html.replace(OLD_ENDPOINT, NEW_ENDPOINT));
+        document.write(applyTrialByTrialSaving(html.replace(OLD_ENDPOINT, NEW_ENDPOINT)));
         document.close();
       })
       .catch(error => {
