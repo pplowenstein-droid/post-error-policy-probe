@@ -7,12 +7,25 @@
 </head>
 <body>
   <script>
-    const OLD_ENDPOINT = "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec";
-    const CURRENT_ENDPOINT = "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec";
-    const NEWER_ENDPOINT = "https://script.google.com/macros/s/AKfycbzVKtOL9hKZmx2VJLulkScCUTUk0GpZ2qIWa4mItzVB5z88-eETyQHoJTiQTmEDLeNMlQ/exec";
-    const NEW_ENDPOINT = "https://script.google.com/macros/s/AKfycbwR9vPmUEjrhQUFNCVJayp9JfuVwtJtOW05InqxErFvYFLApxDUGxYO4L_Ybh8y6tQhlQ/exec";
+    const ENDPOINTS = [
+      "https://script.google.com/macros/s/AKfycbxRfWPZ7UBGUx24QJUbQlhVx9iUhEeJ9O6oXorThwvPKHO_K2kbiUvirIOXtszZEm9L/exec",
+      "https://script.google.com/macros/s/AKfycby29irYRz84G0sVmQxrxTuPcdlpNIU_CVsh6mHP6YOPe5qNToZkzX6ge3OpI_YJ6pGnXw/exec",
+      "https://script.google.com/macros/s/AKfycbzVKtOL9hKZmx2VJLulkScCUTUk0GpZ2qIWa4mItzVB5z88-eETyQHoJTiQTmEDLeNMlQ/exec"
+    ];
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwR9vPmUEjrhQUFNCVJayp9JfuVwtJtOW05InqxErFvYFLApxDUGxYO4L_Ybh8y6tQhlQ/exec";
 
-    function applyTrialByTrialSaving(html) {
+    function replaceAllText(html, from, to) {
+      return html.split(from).join(to);
+    }
+
+    function patchEndpoint(html) {
+      ENDPOINTS.forEach(endpoint => {
+        html = replaceAllText(html, endpoint, WEB_APP_URL);
+      });
+      return html;
+    }
+
+    function patchTrialSaving(html) {
       html = html.replace(
         "let trialsData = [];\n        let trialList = [];",
         "let trialsData = [];\n        let pendingTrialRecords = [];\n        let trialSubmissionChain = Promise.resolve();\n        let trialList = [];"
@@ -76,7 +89,7 @@
       return html;
     }
 
-    function applyDemographicRequirements(html) {
+    function patchDemographics(html) {
       if (!html.includes('id="gender"')) {
         html = html.replace(
           `                <label>Dominant hand
@@ -128,10 +141,15 @@
                     </select>
                 </label>
                 <label>Age
-                    <input type="number" id="age" min="18" max="100" required placeholder="18-100">
+                    <input type="number" id="age" min="18" max="100" placeholder="Optional">
                 </label>`
         );
       }
+
+      html = html.replace(
+        `                    <input type="number" id="age" min="18" max="100" required placeholder="18-100">`,
+        `                    <input type="number" id="age" min="18" max="100" placeholder="Optional">`
+      );
 
       if (!html.includes('const genderInput = document.getElementById("gender");')) {
         html = html.replace(
@@ -173,26 +191,30 @@
         );
       }
 
-      if (!html.includes('if (!ageInput.value)')) {
-        html = html.replace(
-          `            if (!genderInput.value) {
-                genderInput.focus();
-                genderInput.reportValidity();
-                return;
-            }
-
-            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`,
-          `            if (!genderInput.value) {
-                genderInput.focus();
-                genderInput.reportValidity();
-                return;
-            }
-            if (!ageInput.value) {
+      html = html.replace(
+        `            if (!ageInput.value) {
                 ageInput.focus();
                 ageInput.reportValidity();
                 return;
             }
 
+            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`,
+        `            if (ageInput.value && !ageInput.reportValidity()) {
+                return;
+            }
+
+            const participantAge = ageInput.value.trim() === "" ? "" : Number(ageInput.value);
+            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`
+      );
+
+      if (!html.includes('const participantAge = ageInput.value.trim()')) {
+        html = html.replace(
+          `            participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`,
+          `            if (ageInput.value && !ageInput.reportValidity()) {
+                return;
+            }
+
+            const participantAge = ageInput.value.trim() === "" ? "" : Number(ageInput.value);
             participantId = partIdInput.value.trim() || "P" + Math.random().toString(36).substring(2, 8).toUpperCase();`
         );
       }
@@ -207,12 +229,17 @@
         );
       }
 
-      if (!html.includes('Age: Number(ageInput.value)')) {
+      html = html.replace(
+        `                Age: Number(ageInput.value),`,
+        `                Age: participantAge,`
+      );
+
+      if (!html.includes('Age: participantAge')) {
         html = html.replace(
           `                Gender: genderInput.value,
                 Viewport_Width: window.innerWidth,`,
           `                Gender: genderInput.value,
-                Age: Number(ageInput.value),
+                Age: participantAge,
                 Viewport_Width: window.innerWidth,`
         );
       }
@@ -246,11 +273,7 @@
       .then(response => response.text())
       .then(html => {
         document.open();
-        const endpointPatched = html
-          .replace(OLD_ENDPOINT, NEW_ENDPOINT)
-          .replace(CURRENT_ENDPOINT, NEW_ENDPOINT)
-          .replace(NEWER_ENDPOINT, NEW_ENDPOINT);
-        document.write(applyDemographicRequirements(applyTrialByTrialSaving(endpointPatched)));
+        document.write(patchDemographics(patchTrialSaving(patchEndpoint(html))));
         document.close();
       })
       .catch(error => {
