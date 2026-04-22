@@ -141,14 +141,18 @@
                     </select>
                 </label>
                 <label>Age
-                    <input type="number" id="age" min="18" max="100" placeholder="Optional">
+                    <input type="number" id="age" min="0" max="120" placeholder="Optional">
                 </label>`
         );
       }
 
       html = html.replace(
         `                    <input type="number" id="age" min="18" max="100" required placeholder="18-100">`,
-        `                    <input type="number" id="age" min="18" max="100" placeholder="Optional">`
+        `                    <input type="number" id="age" min="0" max="120" placeholder="Optional">`
+      );
+      html = html.replace(
+        `                    <input type="number" id="age" min="18" max="100" placeholder="Optional">`,
+        `                    <input type="number" id="age" min="0" max="120" placeholder="Optional">`
       );
 
       if (!html.includes('const genderInput = document.getElementById("gender");')) {
