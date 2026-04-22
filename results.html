@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Error Policy Probe Results</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #d9e2ec;
+      --blue: #2563eb;
+      --green: #15803d;
+      --amber: #b45309;
+      --red: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 20px 24px;
+    }
+
+    .topbar {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: 0;
+    }
+
+    .subtext {
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 0.95rem;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    button, select {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    button {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .metric, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .metric {
+      padding: 16px;
+      min-height: 96px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric .value {
+      margin-top: 8px;
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .metric .note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 320px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      min-width: 820px;
+      background: white;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 800;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .empty, .error {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      color: var(--muted);
+    }
+
+    .error { color: var(--red); }
+
+    @media (max-width: 900px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      header, main { padding-left: 14px; padding-right: 14px; }
+      .metrics { grid-template-columns: 1fr; }
+      .chart-wrap { height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1>Post-Error Policy Probe Results</h1>
+        <div class="subtext">Live summary from the Google Sheet connected to the experiment.</div>
+      </div>
+      <div class="controls">
+        <select id="participant-filter" aria-label="Participant filter">
+          <option value="all">All participants</option>
+        </select>
+        <button id="refresh-btn">Refresh</button>
+        <span id="status" class="status">Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="message"></section>
+
+    <section class="metrics" aria-label="Summary metrics">
+      <div class="metric">
+        <div class="label">Participants</div>
+        <div class="value" id="metric-participants">--</div>
+        <div class="note" id="metric-rows">-- rows</div>
+      </div>
+      <div class="metric">
+        <div class="label">Policy Probes</div>
+        <div class="value" id="metric-probes">--</div>
+        <div class="note">farther target is more salient</div>
+      </div>
+      <div class="metric">
+        <div class="label">Salient Choice</div>
+        <div class="value" id="metric-salient">--</div>
+        <div class="note">on policy probe trials</div>
+      </div>
+      <div class="metric">
+        <div class="label">After Clear Error</div>
+        <div class="value" id="metric-clear">--</div>
+        <div class="note">salient choice rate</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>Policy Shift by Previous Error</h2>
+        <div class="chart-wrap"><canvas id="policy-chart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Core Timing and Error</h2>
+        <div class="chart-wrap"><canvas id="summary-chart"></canvas></div>
+      </div>
+      <div class="panel" style="grid-column: 1 / -1;">
+        <h2>Latest Trial Rows</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Participant</th>
+                <th>Trial</th>
+                <th>Role</th>
+                <th>Prev Error</th>
+                <th>Choice</th>
+                <th>Salient Choice</th>
+                <th>RT</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody id="latest-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzVKtOL9hKZmx2VJLulkScCUTUk0GpZ2qIWa4mItzVB5z88-eETyQHoJTiQTmEDLeNMlQ/exec";
+    const refreshBtn = document.getElementById("refresh-btn");
+    const statusEl = document.getElementById("status");
+    const messageEl = document.getElementById("message");
+    const participantFilter = document.getElementById("participant-filter");
+    let rawRows = [];
+    let policyChart;
+    let summaryChart;
+
+    refreshBtn.addEventListener("click", loadData);
+    participantFilter.addEventListener("change", renderDashboard);
+    loadData();
+    setInterval(loadData, 30000);
+
+    async function loadData() {
+      refreshBtn.disabled = true;
+      statusEl.textContent = "Loading...";
+      messageEl.innerHTML = "";
+
+      try {
+        const response = await fetch(WEB_APP_URL, { cache: "no-store" });
+        const result = await response.json();
+        if (result.status !== "success" || !Array.isArray(result.data)) {
+          throw new Error("Apps Script returned an unexpected response.");
+        }
+        rawRows = result.data;
+        updateParticipantFilter(rawRows);
+        renderDashboard();
+        statusEl.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        console.error(error);
+        messageEl.innerHTML = `<div class="error">Could not load data from the Google Sheet. Check that the Apps Script deployment allows Anyone access and that doGet returns JSON.</div>`;
+        statusEl.textContent = "Load failed";
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    }
+
+    function updateParticipantFilter(rows) {
+      const current = participantFilter.value;
+      const participants = unique(rows.map(row => row.Participant_ID).filter(Boolean)).sort();
+      participantFilter.innerHTML = `<option value="all">All participants</option>` + participants.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join("");
+      participantFilter.value = participants.includes(current) ? current : "all";
+    }
+
+    function renderDashboard() {
+      const selected = participantFilter.value;
+      const rows = selected === "all" ? rawRows : rawRows.filter(row => row.Participant_ID === selected);
+      const mainRows = rows.filter(row => row.Phase === "Main");
+      const probes = mainRows.filter(row => num(row.Policy_Probe) === 1);
+      const clearErrorProbes = probes.filter(row => num(row.Previous_Main_Clear_Miss) === 1 || num(row.Paired_Error_Px) >= num(row.Post_Miss_Error_Threshold_Px, 20));
+      const smallErrorProbes = probes.filter(row => num(row.Paired_Error_Px) < num(row.Post_Miss_Error_Threshold_Px, 20));
+
+      document.getElementById("metric-participants").textContent = unique(rows.map(row => row.Participant_ID).filter(Boolean)).length;
+      document.getElementById("metric-rows").textContent = `${rows.length} rows`;
+      document.getElementById("metric-probes").textContent = probes.length;
+      document.getElementById("metric-salient").textContent = pct(mean(probes.map(row => numOrNull(row.Salient_Choice_On_Policy_Probe))));
+      document.getElementById("metric-clear").textContent = pct(mean(clearErrorProbes.map(row => numOrNull(row.Salient_Choice_On_Policy_Probe))));
+
+      if (rows.length === 0) {
+        messageEl.innerHTML = `<div class="empty">No rows yet. Once someone completes trials, the dashboard will populate here.</div>`;
+      } else {
+        messageEl.innerHTML = "";
+      }
+
+      renderPolicyChart(smallErrorProbes, clearErrorProbes);
+      renderSummaryChart(mainRows, probes);
+      renderLatestRows(rows);
+    }
+
+    function renderPolicyChart(smallErrorProbes, clearErrorProbes) {
+      const ctx = document.getElementById("policy-chart");
+      const smallRate = mean(smallErrorProbes.map(row => numOrNull(row.Salient_Choice_On_Policy_Probe)));
+      const clearRate = mean(clearErrorProbes.map(row => numOrNull(row.Salient_Choice_On_Policy_Probe)));
+      const data = [toPercentNumber(smallRate), toPercentNumber(clearRate)];
+
+      if (policyChart) policyChart.destroy();
+      policyChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: [`After hit/small error (n=${smallErrorProbes.length})`, `After clear error (n=${clearErrorProbes.length})`],
+          datasets: [{
+            label: "Chose farther/more salient target",
+            data,
+            backgroundColor: ["rgba(37, 99, 235, 0.72)", "rgba(21, 128, 61, 0.72)"],
+            borderColor: ["#2563eb", "#15803d"],
+            borderWidth: 1,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { min: 0, max: 100, title: { display: true, text: "Percent salient choice" } },
+            x: { ticks: { maxRotation: 0, autoSkip: false } }
+          }
+        }
+      });
+    }
+
+    function renderSummaryChart(mainRows, probes) {
+      const ctx = document.getElementById("summary-chart");
+      const meanRt = mean(mainRows.map(row => numOrNull(row.Reaction_Time)));
+      const meanError = mean(mainRows.map(row => numOrNull(row.Error_From_Target_Center_Px)));
+      const meanCost = mean(probes.map(row => numOrNull(row.Action_Cost_To_Chosen_Target_Px)));
+
+      if (summaryChart) summaryChart.destroy();
+      summaryChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["Mean RT (ms)", "Mean error (px)", "Probe action cost (px)"],
+          datasets: [{
+            label: "Mean",
+            data: [round(meanRt), round(meanError), round(meanCost)],
+            backgroundColor: ["rgba(180, 83, 9, 0.72)", "rgba(185, 28, 28, 0.68)", "rgba(37, 99, 235, 0.68)"],
+            borderColor: ["#b45309", "#b91c1c", "#2563eb"],
+            borderWidth: 1,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderLatestRows(rows) {
+      const latest = [...rows].sort((a, b) => new Date(b.Timestamp_ISO || 0) - new Date(a.Timestamp_ISO || 0)).slice(0, 20);
+      document.getElementById("latest-body").innerHTML = latest.map(row => `
+        <tr>
+          <td>${formatTime(row.Timestamp_ISO)}</td>
+          <td>${escapeHtml(row.Participant_ID || "")}</td>
+          <td>${escapeHtml(row.Main_Trial_Number || row.Trial_Number || "")}</td>
+          <td>${escapeHtml(row.Trial_Role || "")}</td>
+          <td>${displayValue(row.Paired_Error_Px || row.Previous_Main_Error_Px)}</td>
+          <td>${escapeHtml(row.Choice_Label || "")}</td>
+          <td>${displayBinary(row.Salient_Choice_On_Policy_Probe)}</td>
+          <td>${displayValue(row.Reaction_Time)}</td>
+          <td>${displayValue(row.Error_From_Target_Center_Px)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function unique(values) {
+      return [...new Set(values)];
+    }
+
+    function num(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function numOrNull(value) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function mean(values) {
+      const valid = values.filter(value => value !== null && Number.isFinite(value));
+      if (valid.length === 0) return null;
+      return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+    }
+
+    function toPercentNumber(value) {
+      return value === null ? 0 : Math.round(value * 1000) / 10;
+    }
+
+    function pct(value) {
+      return value === null ? "--" : `${toPercentNumber(value)}%`;
+    }
+
+    function round(value) {
+      return value === null ? 0 : Math.round(value);
+    }
+
+    function formatTime(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
+      return date.toLocaleString();
+    }
+
+    function displayBinary(value) {
+      if (value === "" || value === null || value === undefined) return "";
+      return num(value) === 1 ? "Yes" : "No";
+    }
+
+    function displayValue(value) {
+      if (value === "" || value === null || value === undefined) return "";
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? String(Math.round(parsed)) : escapeHtml(String(value));
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;"
+      })[char]);
+    }
+  </script>
+</body>
+</html>
